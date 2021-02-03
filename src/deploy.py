@@ -10,7 +10,7 @@ import subprocess
 import json
 import http.client
 
-version = "v1.2.12"
+version = "v1.2.13"
 
 def usage():
     print("AirShip [%s] usage: deploy.py [server name] {commands} {options}" % version)
@@ -251,9 +251,6 @@ commands = []
 server_name = ""
 commands_str = ""
 
-if commands_str != "":
-    commands = commands_str.strip('').split(",")
-
 flags = []
 
 for i, arg in enumerate(sys.argv):
@@ -263,6 +260,9 @@ for i, arg in enumerate(sys.argv):
         server_name = arg
     elif i > 0 and commands_str == "":
         commands_str = arg
+
+if commands_str != "":
+    commands = commands_str.strip('').split(",")
 
 debug_flag = "-v" in flags
 dry_run_flag = "--dry" in flags
