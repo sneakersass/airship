@@ -10,7 +10,7 @@ import subprocess
 import json
 import http.client
 
-version = "v1.2.11"
+version = "v1.2.12"
 
 def usage():
     print("AirShip [%s] usage: deploy.py [server name] {commands} {options}" % version)
