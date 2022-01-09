@@ -10,7 +10,7 @@ import subprocess
 import json
 import http.client
 
-version = "v1.2.16"
+version = "v1.2.17"
 
 def usage():
     print("AirShip [%s] usage: deploy.py [server name] {commands} {options}" % version)
@@ -445,7 +445,7 @@ for command in commands:
         ssh(server, replace_variables(config.variables, config.run_command))
 
     else:
-        if config.user_commands:
+        if hasattr(config, 'user_commands'):
             if command in config.user_commands:
                 mes("Start user command: %s, %s, server [%s]" % (command, config.user_commands[command]['place'], server_name))
                 user_commands(

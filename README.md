@@ -8,4 +8,6 @@
 - Supports global or server variables in files contents and paths
 - Supports server init commands
 
+### Changelog
 
+[HERE](CHANGELOG.MD)
