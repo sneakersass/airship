@@ -10,15 +10,15 @@ import subprocess
 import json
 import http.client
 
-version = "v1.2.13"
+version = "v1.2.14"
 
 def usage():
     print("AirShip [%s] usage: deploy.py [server name] {commands} {options}" % version)
     print("")
     print("Commands: ")
-    print(" build    build and push docker containers to registry")
+    print(" build    build docker containers")
+    print(" push     push docker containers to registry")
     print(" deploy   make environment archive, upload it to server, and run")
-    print(" init     run init commands on destination server")
     print(" run      execute 'run' command")
     print("")
     print("Options: ")
@@ -194,9 +194,13 @@ def docker_import(server, variables, container):
     ))
 
 
-def init_server(server, variables, commands):
-    for command in commands:
-        ssh(server, replace_variables(variables, command))
+def user_commands(server, variables, commands, place):
+    if place == 'remote':
+        for command in commands:
+            ssh(server, replace_variables(variables, command))
+    else:
+        for command in commands:
+            run(replace_variables(variables, command))
 
 
 def stage_cleanup_temp_dir():
@@ -274,7 +278,7 @@ if len(sys.argv) < 2:
     usage()
     exit()
 
-if 'run' in commands or 'deploy' in commands or 'build' in commands or 'init' in commands:
+if 'run' in commands or 'deploy' in commands or 'build' in commands or 'push' in commands or 'init' in commands:
     if len(sys.argv) < 3:
         usage()
         exit()
@@ -302,7 +306,6 @@ if server_name != '':
 config.variables.update(
     {
         'DESTINATION_DIR': config.destination_dir,
-        'DOCKER_PROJECT_NAME': config.docker_project_name,
     }
 )
 
@@ -327,122 +330,128 @@ if version_flag:
     commands = ['version']
 
 if len(commands) < 1:
-    ask = input("Do you want to build and deploy v%s to [%s] Y/n: " % (server['version'], server_name))
+    ask = input("Do you want to build, push and deploy v%s to [%s] Y/n: " % (server['version'], server_name))
     if ask == "Y" or ask == "y" or ask == "":
-        commands = ['build', 'deploy']
+        commands = ['build', 'push', 'deploy']
     else:
         exit()
 
 # -- Commands
 
-# Version
-if 'version' in commands:
-    mes("Current version is %s" % version)
+for command in commands:
+    if command == 'version':
+        mes("Current version is %s" % version)
 
-# Update
-if 'update' in commands:
-    mes("Checking for updates...")
-    update()
+    elif command == 'update':
+        mes("Checking for updates...")
+        update()
 
-# Build
-if 'init' in commands:
-    mes("Start initializing server [%s]" % server_name)
-    init_server(server, config.variables, config.server_init_commands)
+    elif command == 'build':
+        mes("Start building v%s for [%s]" % (server['version'], server_name))
 
-# Build
-if 'build' in commands:
-    mes("Start building v%s for [%s]" % (server['version'], server_name))
+        stage_cleanup_temp_dir()
 
-    stage_cleanup_temp_dir()
+        mes("Build containers")
+        for container in config.containers:
+            docker_build(config.variables, container)
 
-    mes("Build containers")
-    for container in config.containers:
-        docker_build(config.variables, container)
-        if 'arch_name' not in container:
-            docker_push(config.variables, container)
+    elif command == 'push':
+        mes("Start pushing containers v%s for [%s]" % (server['version'], server_name))
+        mes("Push containers")
+        for container in config.containers:
+            if 'arch_name' not in container:
+                docker_push(config.variables, container)
 
-# Deploy
-if 'deploy' in commands:
-    mes("Start deploy v%s to [%s]" % (server['version'], server_name))
+    elif command == 'deploy':
+        mes("Start deploy v%s to [%s]" % (server['version'], server_name))
 
-    deb("Variables: %r" % config.variables)
+        deb("Variables: %r" % config.variables)
 
-    stage_cleanup_temp_dir()
+        stage_cleanup_temp_dir()
 
-    mes("Dump containers")
-    for container in config.containers:
-        if 'arch_name' in container:
-            docker_dump(config.variables, container)
+        mes("Dump containers")
+        for container in config.containers:
+            if 'arch_name' in container:
+                docker_dump(config.variables, container)
 
-    mes("Copy environment files")
-    for file in config.files:
-        file['path'] = os.path.join(config.work_dir, file['path'])
-        file['path'] = replace_variables(config.variables, file['path'])
+        mes("Copy environment files")
+        for file in config.files:
+            file['path'] = os.path.join(config.work_dir, file['path'])
+            file['path'] = replace_variables(config.variables, file['path'])
 
-        file['env_path'] = os.path.join(config.temp_dir_environment, file['env_path'])
-        file['env_path'] = replace_variables(config.variables, file['env_path'])
+            file['env_path'] = os.path.join(config.temp_dir_environment, file['env_path'])
+            file['env_path'] = replace_variables(config.variables, file['env_path'])
 
-        if not os.path.exists(file['path']):
-            err("File/dir %s not exist" % file['path'])
-            continue
+            if not os.path.exists(file['path']):
+                err("File/dir %s not exist" % file['path'])
+                continue
 
-        if os.path.isfile(file['path']):
-            # @TODO mkdir?
-            copy_and_replace(config.variables, file)
+            if os.path.isfile(file['path']):
+                # @TODO mkdir?
+                copy_and_replace(config.variables, file)
 
-        if os.path.isdir(file['path']):
-            copy_dir(file)
+            if os.path.isdir(file['path']):
+                copy_dir(file)
 
-            if 'replace_vars' in file and file['replace_vars']:
-                for dirFile in find_files_for_replace(file['path'], config.replace_vars_file_patterns):
-                    copy_and_replace(
-                        config.variables,
-                        {
-                            'path': dirFile,
-                            'replace_vars': True,
-                            'env_path': os.path.join(config.temp_dir_environment, file['env_path'],
-                                                     os.path.relpath(dirFile, file['path']))
-                        }
-                    )
+                if 'replace_vars' in file and file['replace_vars']:
+                    for dirFile in find_files_for_replace(file['path'], config.replace_vars_file_patterns):
+                        copy_and_replace(
+                            config.variables,
+                            {
+                                'path': dirFile,
+                                'replace_vars': True,
+                                'env_path': os.path.join(config.temp_dir_environment, file['env_path'],
+                                                         os.path.relpath(dirFile, file['path']))
+                            }
+                        )
 
-    mes("Build archive(s)")
-    archive(os.path.join(config.temp_dir_archives, config.arch_name), config.temp_dir_environment)
+        mes("Build archive(s)")
+        archive(os.path.join(config.temp_dir_archives, config.arch_name), config.temp_dir_environment)
 
-    mes("Create destination dir [%s] on destination server" % config.destination_dir)
-    ssh(server, "mkdir -p %s" % config.destination_dir)
+        mes("Create destination dir [%s] on destination server" % config.destination_dir)
+        ssh(server, "mkdir -p %s" % config.destination_dir)
 
-    mes("Upload archive")
-    upload(server, "%s/*" % config.temp_dir_archives, "%s/" % config.destination_dir)
+        mes("Upload archive")
+        upload(server, "%s/*" % config.temp_dir_archives, "%s/" % config.destination_dir)
 
-    mes("Extract archive")
-    ssh(server, "cd %s && tar -xzf %s --totals ." % (config.destination_dir, config.arch_name))
+        mes("Extract archive")
+        ssh(server, "cd %s && tar -xzf %s --totals ." % (config.destination_dir, config.arch_name))
 
-    for container in config.containers:
-        if 'arch_name' in container:
-            temp_path = config.temp_dir_environment
-            if 'deploy_separately' in container and 'deploy_separately' in container and container['deploy_separately']:
-                temp_path = config.temp_dir_containers
+        for container in config.containers:
+            if 'arch_name' in container:
+                temp_path = config.temp_dir_environment
+                if 'deploy_separately' in container and 'deploy_separately' in container and container['deploy_separately']:
+                    temp_path = config.temp_dir_containers
 
-                temp_path = os.path.join(temp_path, replace_variables(config.variables, container['arch_name']))
+                    temp_path = os.path.join(temp_path, replace_variables(config.variables, container['arch_name']))
 
-                excludeVariables = {}
-                for var, val in config.variables.items():
-                    excludeVariables[var] = "*[^" + val + "]"
+                    excludeVariables = {}
+                    for var, val in config.variables.items():
+                        excludeVariables[var] = "*[^" + val + "]"
 
-                if 'remove_old' in container and container['remove_old']:
-                    ssh(server, "rm -f " + os.path.join(config.destination_dir,
-                                                        replace_variables(excludeVariables, container['arch_name'])))
+                    if 'remove_old' in container and container['remove_old']:
+                        ssh(server, "rm -f " + os.path.join(config.destination_dir,
+                                                            replace_variables(excludeVariables, container['arch_name'])))
 
-                upload(server, temp_path, config.destination_dir,
-                       'ignore_existing' in container and container['ignore_existing'])
-            docker_import(server, config.variables, container)
+                    upload(server, temp_path, config.destination_dir,
+                           'ignore_existing' in container and container['ignore_existing'])
+                docker_import(server, config.variables, container)
 
-    mes("Run")
-    ssh(server, replace_variables(config.variables, config.run_command))
+        mes("Run")
+        ssh(server, replace_variables(config.variables, config.run_command))
 
-# Run
-if 'run' in commands:
-    mes("Run")
-    ssh(server, replace_variables(config.variables, config.run_command))
+    elif command == 'run':
+        mes("Run")
+        ssh(server, replace_variables(config.variables, config.run_command))
+
+    else:
+        if command in config.user_commands:
+            mes("Start user command: %s, %s, server [%s]" % (command, config.user_commands[command]['place'], server_name))
+            user_commands(
+                server,
+                config.variables,
+                config.user_commands[command]['commands'],
+                config.user_commands[command]['place']
+            )
 
 ### END OF CODE
