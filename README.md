@@ -10,4 +10,4 @@
 
 ### Changelog
 
-[HERE](CHANGELOG.MD)
+[HERE](CHANGELOG.md)
