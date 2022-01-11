@@ -9,8 +9,9 @@ import signal
 import subprocess
 import json
 import http.client
+from datetime import datetime
 
-version = "v1.2.18"
+version = "v1.2.19"
 
 def usage():
     print("AirShip [%s] usage: deploy.py [server name] {commands} {options}" % version)
@@ -33,7 +34,7 @@ def usage():
 # -- Lib
 
 def mes(text):
-    print('\033[92m# ' + text + '\033[0m')
+    print('\033[92m# [' + datetime.now().strftime('%H:%M:%S.%f') + '] ' + text + '\033[0m')
 
 
 def err(text):

@@ -1,5 +1,8 @@
 [README](README.md)
 
+### 1.2.19
+- Add step start time to output
+
 ### 1.2.18
 - Remove init command (use user commands instead)
 - Add user commands
