@@ -1,5 +1,8 @@
 [README](README.md)
 
+### 1.2.20
+- Add SERVER_HOST to variables
+
 ### 1.2.19
 - Add step start time to output
 

@@ -11,7 +11,7 @@ import json
 import http.client
 from datetime import datetime
 
-version = "v1.2.19"
+version = "v1.2.20"
 
 def usage():
     print("AirShip [%s] usage: deploy.py [server name] {commands} {options}" % version)
@@ -292,6 +292,7 @@ if server_name != '':
 
     config.variables.update(
         {
+            'SERVER_HOST': server['host'],
             'SERVER_NAME': server_name,
             'VERSION': server['version'],
             'ENV': server['env'],
